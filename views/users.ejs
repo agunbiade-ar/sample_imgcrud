@@ -14,7 +14,7 @@
             <div class="user">
                 <h3><%= user.name %></h3>
                 <figure>
-                    <img src="<%= user.avatar %>" alt="User Avatar">
+                    <img class="img-thumbnail" height="250" width="250px" src="<%= user.avatar %>" alt="User Avatar">
                 </figure>
                  <a href="/user/<%= user._id %>"><button class="normal">Edit</button></a>
                 <button class="normal" onclick="document.getElementById('id01').style.display='block'">Delete</button>

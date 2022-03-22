@@ -8,7 +8,7 @@
     <title>Document</title>
 </head>
 <body>
-    <form action="/user/<%= user._id %>?_method=PUT" method="post">
+    <form action="/user/<%= user._id %>?_method=PUT" method="post"  encType="multipart/form-data">
         <div class="mb-3">
             <label for="name">Name</label>
             <input type="text" class="form-control" name="name" id="name" value="<%= user.name %>">

@@ -10,9 +10,15 @@ const path = require('path')
 const User = require('./models/user')
 const cloudinary = require('cloudinary').v2
 const upload = require('./utils/multer');
-const { findById } = require('./models/user');
 
 const port = 3000
+
+const cloudinary_parameters = {
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY, 
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+    secure: true
+}
 
 //connect to mongodb local
 mongoose.connect(process.env.DATABASE_URL)
@@ -49,11 +55,7 @@ app.post('/user', upload.single('image'), async function(req, res){
     }
     else{
         try {
-            await cloudinary.uploader.upload(req.file.path, {
-                cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-                api_key: process.env.CLOUDINARY_API_KEY, 
-                api_secret: process.env.CLOUDINARY_API_SECRET
-            }).then( result => {
+            await cloudinary.uploader.upload(req.file.path, cloudinary_parameters).then( result => {
                 
                 let details = new User({
                     name: req.body.name,
@@ -88,30 +90,40 @@ app.get("/user/:id", function(req, res){
 })
 
 app.put("/user/:id", upload.single('image'), async function(req, res){
-
-try {
-    let user = await findById(req.params.id)
-    await cloudinary.uploader.destroy(user.cloudinary_id)
-
-    await cloudinary.uplolader.upload(req.file.path, {
-        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-        api_key: process.env.CLOUDINARY_API_KEY, 
-        api_secret: process.env.CLOUDINARY_API_SECRET
-    }).then( result => {
-        const data ={ 
-            name: req.body.name || user.name,
-            avatar: result.secure_url || user.avatar,
-            cloudinary_id: result.public_id || user.cloudinary_id
+    try {
+        
+        let user = await User.findById(req.params.id)
+        if(req.body.name != user.name && req.body.name !== ''){
+            user.name = req.body.name
         }
-        await User.findByIdAndUpdate(req.params.id, data, {new: true}).then( user=>{
-            console.log('Successfully updated')
-            res.redirect('/users')
-        })
-    })
-} catch (error) {
-    console.log(error)
-}
 
+        if(req.file){
+            await cloudinary.uploader.destroy(user.cloudinary_id, function(err, result){
+            if(err) { console.log(err); }
+            // else{ console.log(result) }
+            })
+
+            await cloudinary.uploader.upload(req.file.path, cloudinary_parameters).then(
+                result => {
+                    user.avatar = result.secure_url       
+                    user.cloudinary_id = result.public_id
+                    console.log(result)
+                    }
+            ).catch( err => {
+                console.log(err)
+            })
+        }
+
+        await User.findByIdAndUpdate(req.params.id, user, {new: true}).then( 
+            user => {
+                console.log('Successfully Updated')
+                res.redirect('/users')
+            }
+        )} catch (error) {
+            console.log(error)
+        }
+
+    // res.json(user)
 })
 
 app.listen(port)
