@@ -6,6 +6,7 @@ const dotenv = require('dotenv')
 dotenv.config()
 
 const path = require('path')
+const fs = require('fs')
 
 const User = require('./models/user')
 const cloudinary = require('cloudinary').v2
@@ -19,6 +20,7 @@ const cloudinary_parameters = {
     api_secret: process.env.CLOUDINARY_API_SECRET,
     secure: true
 }
+cloudinary.config(cloudinary_parameters)
 
 //connect to mongodb local
 mongoose.connect(process.env.DATABASE_URL)
@@ -55,19 +57,21 @@ app.post('/user', upload.single('image'), async function(req, res){
     }
     else{
         try {
-            await cloudinary.uploader.upload(req.file.path, cloudinary_parameters).then( result => {
-                
+            await cloudinary.uploader.upload(req.file.path).then( result => {
+
                 let details = new User({
                     name: req.body.name,
                     avatar: result.secure_url,
                     cloudinary_id: result.public_id
                 })
                 details.save().then(detail => {
-                    console.log(detail)
+                    // console.log(detail)
                     // res.redirect('/users')
-                    res.redirect('/')
+                    res.redirect('/users')
                 })
             })
+            //delete the file from file system
+            removeFile(req.file.path)
         } catch (error) {
             console.error(error)
         }
@@ -75,9 +79,7 @@ app.post('/user', upload.single('image'), async function(req, res){
 })
 
 app.get('/users', async function(req, res){
-
     const users = await User.find({})
-    // res.send('all users')
     res.render('users', {users: users})
 })
 
@@ -91,10 +93,11 @@ app.get("/user/:id", function(req, res){
 
 app.put("/user/:id", upload.single('image'), async function(req, res){
     try {
-        
+        let details = {}
         let user = await User.findById(req.params.id)
+        
         if(req.body.name != user.name && req.body.name !== ''){
-            user.name = req.body.name
+            details.name = req.body.name
         }
 
         if(req.file){
@@ -103,10 +106,10 @@ app.put("/user/:id", upload.single('image'), async function(req, res){
             // else{ console.log(result) }
             })
 
-            await cloudinary.uploader.upload(req.file.path, cloudinary_parameters).then(
+            await cloudinary.uploader.upload(req.file.path).then(
                 result => {
-                    user.avatar = result.secure_url       
-                    user.cloudinary_id = result.public_id
+                    details.avatar = result.secure_url       
+                    details.cloudinary_id = result.public_id
                     console.log(result)
                     }
             ).catch( err => {
@@ -114,8 +117,8 @@ app.put("/user/:id", upload.single('image'), async function(req, res){
             })
         }
 
-        await User.findByIdAndUpdate(req.params.id, user, {new: true}).then( 
-            user => {
+        await User.findByIdAndUpdate(req.params.id, details, {new: true}).then( 
+            x => {
                 console.log('Successfully Updated')
                 res.redirect('/users')
             }
@@ -125,5 +128,24 @@ app.put("/user/:id", upload.single('image'), async function(req, res){
 
     // res.json(user)
 })
+
+app.delete('/user/:id', async function(req, res){
+    try {
+        let user = await User.findById(req.params.id);
+        await cloudinary.uploader.destroy(user.cloudinary_id);
+        // Delete user from db
+        await user.remove();
+        res.redirect('/users')
+    } catch (error) {
+        console.log(error, 'Could not delete')
+    }
+})
+
+function removeFile(filename){
+    fs.unlink(path.join(__dirname, filename), err => { 
+        if(err) console.error(err)
+    })
+}
+
 
 app.listen(port)
