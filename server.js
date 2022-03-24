@@ -66,7 +66,6 @@ app.post('/user', upload.single('image'), async function(req, res){
                 })
                 details.save().then(detail => {
                     // console.log(detail)
-                    // res.redirect('/users')
                     res.redirect('/users')
                 })
             })
@@ -103,7 +102,6 @@ app.put("/user/:id", upload.single('image'), async function(req, res){
         if(req.file){
             await cloudinary.uploader.destroy(user.cloudinary_id, function(err, result){
             if(err) { console.log(err); }
-            // else{ console.log(result) }
             })
 
             await cloudinary.uploader.upload(req.file.path).then(
@@ -116,7 +114,8 @@ app.put("/user/:id", upload.single('image'), async function(req, res){
                 console.log(err)
             })
         }
-
+        //delete the file from file system
+        removeFile(req.file.path)
         await User.findByIdAndUpdate(req.params.id, details, {new: true}).then( 
             x => {
                 console.log('Successfully Updated')
@@ -125,20 +124,23 @@ app.put("/user/:id", upload.single('image'), async function(req, res){
         )} catch (error) {
             console.log(error)
         }
-
-    // res.json(user)
 })
 
 app.delete('/user/:id', async function(req, res){
     try {
         let user = await User.findById(req.params.id);
         await cloudinary.uploader.destroy(user.cloudinary_id);
+        
         // Delete user from db
-        await user.remove();
-        res.redirect('/users')
+        await User.findByIdAndRemove({_id: user._id}, function(err, user){
+            if(err) console.log(err)
+            res.redirect('/users')
+        })
     } catch (error) {
         console.log(error, 'Could not delete')
     }
+    // console.log(req.params.id)
+    // res.send('delete route')
 })
 
 function removeFile(filename){
